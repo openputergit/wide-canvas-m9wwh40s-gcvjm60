@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal GPT Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1f82df',
+                        secondary: '#1a78d1',
+                        chatbg: '#f7f7f8',
+                        sidebar: '#202123',
+                        sidebarHover: '#2e2e32',
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .message-user {
+            background-color: white;
+        }
+        
+        .message-assistant {
+            background-color: #f7f7f8;
+        }
+        
+        .typing-indicator::after {
+            content: '...';
+            animation: typing 1.5s infinite;
+        }
+        
+        @keyframes typing {
+            0% { content: '.'; }
+            33% { content: '..'; }
+            66% { content: '...'; }
+        }
+        
+        .scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e0;
+            border-radius: 3px;
+        }
+        
+        .scrollbar::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+        
+        .chat-container {
+            height: calc(100vh - 180px);
+        }
+        
+        .sidebar-transition {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar-closed {
+                transform: translateX(-100%);
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-white overflow-hidden h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="bg-sidebar text-white w-64 flex-shrink-0 sidebar-transition">
+            <div class="p-4 flex flex-col h-full">
+                <!-- New Chat Button -->
+                <button id="newChatBtn" class="flex items-center gap-3 border border-white/20 rounded-md p-3 text-sm mb-2 hover:bg-sidebarHover transition duration-200">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>New chat</span>
+                </button>
+                
+                <!-- History Section -->
+                <div class="mt-4 flex-1 overflow-y-auto scrollbar">
+                    <p class="text-xs text-gray-400 mb-2 px-3">Recent chats</p>
+                    <div id="chatHistory" class="space-y-2">
+                        <!-- Chat history items will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Profile Section -->
+                <div class="mt-auto border-t border-white/20 pt-2">
+                    <div id="userProfileDropdown" class="flex items-center gap-3 p-3 text-sm rounded-md cursor-pointer hover:bg-sidebarHover transition duration-200">
+                        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                            <span id="userInitials">JD</span>
+                        </div>
+                        <span id="userName">John Doe</span>
+                    </div>
+                    
+                    <div id="profileMenu" class="hidden mt-2 bg-sidebarHover rounded-md p-2">
+                        <div class="px-3 py-2 text-sm hover:bg-gray-700 rounded cursor-pointer">
+                            <i class="bi bi-person mr-2"></i> Profile
+                        </div>
+                        <div class="px-3 py-2 text-sm hover:bg-gray-700 rounded cursor-pointer">
+                            <i class="bi bi-gear mr-2"></i> Settings
+                        </div>
+                        <div id="logoutBtn" class="px-3 py-2 text-sm hover:bg-gray-700 rounded cursor-pointer">
+                            <i class="bi bi-box-arrow-right mr-2"></i> Logout
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Main Header -->
+            <div class="bg-white border-b p-3 flex items-center justify-between">
+                <button id="menuToggle" class="md:hidden text-gray-600 hover:text-gray-900 p-2">
+                    <i class="bi bi-list text-xl"></i>
+                </button>
+                <h1 class="text-primary text-lg md:text-xl font-semibold">Personal GPT Assistant</h1>
+                <div class="flex gap-2">
+                    <button id="voiceInputBtn" class="text-primary hover:bg-primary/10 rounded-full p-2 transition">
+                        <i class="bi bi-mic text-xl"></i>
+                    </button>
+                    <button id="themeToggleBtn" class="text-primary hover:bg-primary/10 rounded-full p-2 transition">
+                        <i class="bi bi-moon text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="chatArea" class="flex-1 overflow-y-auto scrollbar px-4 md:px-10 py-6 chat-container">
+                <!-- Welcome Message -->
+                <div class="max-w-3xl mx-auto">
+                    <div class="message-assistant p-4 rounded-lg mb-6 shadow-sm fade-in">
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white mr-4">
+                                <i class="bi bi-robot"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900 mb-1">Assistant</p>
+                                <div class="text-gray-700">
+                                    <p>Hello! I'm your personal GPT Assistant. How can I help you today?</p>
+                                    <ul class="mt-3 space-y-2">
+                                        <li class="flex items-center">
+                                            <i class="bi bi-check-circle-fill text-primary mr-2"></i>
+                                            <span>Ask me questions about your organization</span>
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="bi bi-check-circle-fill text-primary mr-2"></i>
+                                            <span>Upload documents for me to analyze</span>
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="bi bi-check-circle-fill text-primary mr-2"></i>
+                                            <span>Use voice commands by clicking the microphone button</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Messages will be added here -->
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="bg-white border-t p-4">
+                <div class="max-w-3xl mx-auto relative">
+                    <div class="flex items-center">
+                        <div class="relative flex-grow">
+                            <textarea 
+                                id="messageInput" 
+                                rows="1" 
+                                class="w-full border border-gray-300 rounded-lg py-3 pl-4 pr-12 resize-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                placeholder="Message the assistant..."
+                            ></textarea>
+                            <button id="uploadBtn" class="absolute right-12 bottom-2.5 text-gray-400 hover:text-primary p-1">
+                                <i class="bi bi-paperclip text-lg"></i>
+                            </button>
+                            <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.txt"/>
+                        </div>
+                        <button id="sendButton" class="ml-2 bg-primary hover:bg-secondary text-white rounded-lg p-3 transition">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 text-center">
+                        The assistant may produce inaccurate information about people, places, or facts.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Login Modal -->
+            <div id="loginModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-primary">Login</h2>
+                        <button id="closeLoginBtn" class="text-gray-400 hover:text-gray-600">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" id="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <input id="remember" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                <label for="remember" class="ml-2 block text-sm text-gray-900">Remember me</label>
+                            </div>
+                            <div class="text-sm">
+                                <a href="#" class="text-primary hover:underline">Forgot password?</a>
+                            </div>
+                        </div>
+                        <div>
+                            <button id="loginBtn" class="w-full bg-primary hover:bg-secondary text-white py-2 px-4 rounded-md transition">
+                                Login
+                            </button>
+                        </div>
+                        <div class="text-center text-sm">
+                            <p>Don't have an account? <a href="#" id="showSignupBtn" class="text-primary hover:underline">Sign up</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signup Modal -->
+            <div id="signupModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-primary">Create Account</h2>
+                        <button id="closeSignupBtn" class="text-gray-400 hover:text-gray-600">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="firstName" class="block text-sm font-medium text-gray-700">First Name</label>
+                                <input type="text" id="firstName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label for="lastName" class="block text-sm font-medium text-gray-700">Last Name</label>
+                                <input type="text" id="lastName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="signupEmail" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" id="signupEmail" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <label for="signupPassword" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" id="signupPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                            <input type="password" id="confirmPassword" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                        <div>
+                            <button id="signupBtn" class="w-full bg-primary hover:bg-secondary text-white py-2 px-4 rounded-md transition">
+                                Sign Up
+                            </button>
+                        </div>
+                        <div class="text-center text-sm">
+                            <p>Already have an account? <a href="#" id="showLoginBtn" class="text-primary hover:underline">Login</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Input Modal -->
+            <div id="voiceInputModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+                <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 text-center fade-in">
+                    <div class="mb-6">
+                        <div class="w-20 h-20 bg-primary rounded-full mx-auto flex items-center justify-center">
+                            <i class="bi bi-mic text-white text-3xl" id="micIcon"></i>
+                            <i class="bi bi-stop-fill text-white text-3xl hidden" id="stopIcon"></i>
+                        </div>
+                    </div>
+                    <p id="voiceStatus" class="mb-4 text-lg">Listening...</p>
+                    <p id="voiceText" class="mb-6 text-gray-600 italic"></p>
+                    <div class="flex justify-center gap-4">
+                        <button id="cancelVoiceBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-6 rounded-md transition">
+                            Cancel
+                        </button>
+                        <button id="confirmVoiceBtn" class="bg-primary hover:bg-secondary text-white py-2 px-6 rounded-md transition">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // App State
+            const appState = {
+                user: null,
+                darkMode: false,
+                currentChat: null,
+                chats: [],
+                isLoggedIn: false,
+                isSidebarOpen: true,
+                voiceText: '',
+                isRecording: false,
+            };
+
+            // DOM Elements
+            const elements = {
+                sidebar: document.getElementById('sidebar'),
+                menuToggle: document.getElementById('menuToggle'),
+                chatArea: document.getElementById('chatArea'),
+                messageInput: document.getElementById('messageInput'),
+                sendButton: document.getElementById('sendButton'),
+                newChatBtn: document.getElementById('newChatBtn'),
+                chatHistory: document.getElementById('chatHistory'),
+                loginModal: document.getElementById('loginModal'),
+                signupModal: document.getElementById('signupModal'),
+                closeLoginBtn: document.getElementById('closeLoginBtn'),
+                closeSignupBtn: document.getElementById('closeSignupBtn'),
+                showSignupBtn: document.getElementById('showSignupBtn'),
+                showLoginBtn: document.getElementById('showLoginBtn'),
+                loginBtn: document.getElementById('loginBtn'),
+                signupBtn: document.getElementById('signupBtn'),
+                userProfileDropdown: document.getElementById('userProfileDropdown'),
+                profileMenu: document.getElementById('profileMenu'),
+                logoutBtn: document.getElementById('logoutBtn'),
+                uploadBtn: document.getElementById('uploadBtn'),
+                fileInput: document.getElementById('fileInput'),
+                voiceInputBtn: document.getElementById('voiceInputBtn'),
+                voiceInputModal: document.getElementById('voiceInputModal'),
+                cancelVoiceBtn: document.getElementById('cancelVoiceBtn'),
+                confirmVoiceBtn: document.getElementById('confirmVoiceBtn'),
+                micIcon: document.getElementById('micIcon'),
+                stopIcon: document.getElementById('stopIcon'),
+                voiceStatus: document.getElementById('voiceStatus'),
+                voiceText: document.getElementById('voiceText'),
+                userName: document.getElementById('userName'),
+                userInitials: document.getElementById('userInitials'),
+                themeToggleBtn: document.getElementById('themeToggleBtn')
+            };
+
+            // Initialize code (similar to componentDidMount)
+            function init() {
+                setupEventListeners();
+                checkAuth();
+                createNewChat();
+                resizeTextarea();
+            }
+
+            // Function to check if the user is authenticated
+            function checkAuth() {
+                // In a real app, we'd check for a valid token in localStorage/sessionStorage
+                const savedUser = localStorage.getItem('gptUser');
+                
+                if (savedUser) {
+                    appState.user = JSON.parse(savedUser);
+                    appState.isLoggedIn = true;
+                    updateUIAfterLogin();
+                } else {
+                    // Show login modal
+                    elements.loginModal.style.display = 'flex';
+                }
+            }
+
+            // Function to update UI after successful login
+            function updateUIAfterLogin() {
+                if (appState.user) {
+                    elements.userName.textContent = `${appState.user.firstName} ${appState.user.lastName}`;
+                    elements.userInitials.textContent = `${appState.user.firstName[0]}${appState.user.lastName[0]}`;
+                    
+                    // Load user's chat history from DB (mock)
+                    loadChatHistory();
+                }
+            }
+
+            // Mock function to load user's chat history
+            function loadChatHistory() {
+                // This would be an API call in a real app
+                const mockChats = [
+                    { id: 'chat1', title: 'Project Documentation Analysis', timestamp: new Date() },
+                    { id: 'chat2', title: 'Marketing Strategy Questions', timestamp: new Date(Date.now() - 86400000) },
+                    { id: 'chat3', title: 'Technical Support Inquiry', timestamp: new Date(Date.now() - 172800000) }
+                ];
+                
+                appState.chats = mockChats;
+                renderChatHistory();
+            }
+
+            // Render the chat history in the sidebar
+            function renderChatHistory() {
+                elements.chatHistory.innerHTML = '';
+                
+                appState.chats.forEach(chat => {
+                    const chatItem = document.createElement('div');
+                    chatItem.className = 'flex items-center gap-3 p-3 text-sm rounded-md cursor-pointer hover:bg-sidebarHover transition duration-200' +
+                        (chat.id === appState.currentChat ? ' bg-sidebarHover' : '');
+                    chatItem.dataset.chatId = chat.id;
+                    
+                    chatItem.innerHTML = `
+                        <i class="bi bi-chat-left-text"></i>
+                        <div class="truncate">${chat.title}</div>
+                    `;
+                    
+                    chatItem.addEventListener('click', () => loadChat(chat.id));
+                    elements.chatHistory.appendChild(chatItem);
+                });
+            }
+
+            // Function to load a specific chat
+            function loadChat(chatId) {
+                appState.currentChat = chatId;
+                renderChatHistory();
+                
+                // This would load messages from the selected chat in a real app
+                // For now, we'll just clear the chat area and add a mock message
+                elements.chatArea.innerHTML = '';
+                
+                const chat = appState.chats.find(c => c.id === chatId);
+                if (chat) {
+                    addSystemMessage(`Chat loaded: ${chat.title}`);
+                    // In a real app, this would fetch messages from the database
+                }
+            }
+
+            // Function to create a new chat
+            function createNewChat() {
+                const chatId = 'chat' + Date.now();
+                const newChat = {
+                    id: chatId,
+                    title: 'New Conversation',
+                    timestamp: new Date()
+                };
+                
+                appState.chats.unshift(newChat);
+                appState.currentChat = chatId;
+                
+                renderChatHistory();
+                elements.chatArea.innerHTML = '';
+                
+                // Add welcome message
+                addAssistantMessage("Hello! I'm your personal GPT Assistant. How can I help you today?");
+            }
+
+            // Function to add a user message to the chat
+            function addUserMessage(text) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message-user p-4 rounded-lg mb-6 shadow-sm fade-in';
+                messageDiv.innerHTML = `
+                    <div class="flex items-start max-w-3xl mx-auto">
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center text-gray-700 mr-4">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-900 mb-1">You</p>
+                            <div class="text-gray-700">${text}</div>
+                        </div>
+                    </div>
+                `;
+                elements.chatArea.appendChild(messageDiv);
+                elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
+
+                // Update chat title based on first message
+                if (appState.chats.length > 0) {
+                    const currentChat = appState.chats.find(c => c.id === appState.currentChat);
+                    if (currentChat && currentChat.title === 'New Conversation') {
+                        currentChat.title = text.length > 30 ? text.substring(0, 27) + '...' : text;
+                        renderChatHistory();
+                    }
+                }
+
+                // Save to database (mock)
+                saveMessageToDatabase(appState.currentChat, 'user', text);
+            }
+
+            // Function to add an assistant message to the chat
+            function addAssistantMessage(text) {
+                const typingIndicator = document.getElementById('typing-indicator');
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                }
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message-assistant p-4 rounded-lg mb-6 shadow-sm fade-in';
+                messageDiv.innerHTML = `
+                    <div class="flex items-start max-w-3xl mx-auto">
+                        <div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white mr-4">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-900 mb-1">Assistant</p>
+                            <div class="text-gray-700">${text}</div>
+                        </div>
+                    </div>
+                `;
+                elements.chatArea.appendChild(messageDiv);
+                elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
+
+                // Save to database (mock)
+                saveMessageToDatabase(appState.currentChat, 'assistant', text);
+            }
+
+            // Function to add a system message to the chat
+            function addSystemMessage(text) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'p-2 rounded-lg mb-4 text-center';
+                messageDiv.innerHTML = `
+                    <p class="text-sm text-gray-500">${text}</p>
+                `;
+                elements.chatArea.appendChild(messageDiv);
+                elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
+            }
+
+            // Show typing indicator
+            function showTypingIndicator() {
+                const indicatorDiv = document.createElement('div');
+                indicatorDiv.id = 'typing-indicator';
+                indicatorDiv.className = 'message-assistant p-4 rounded-lg mb-6 shadow-sm fade-in';
+                indicatorDiv.innerHTML = `
+                    <div class="flex items-start max-w-3xl mx-auto">
+                        <div class="w-8 h-8 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-white mr-4">
+                            <i class="bi bi-robot"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-900 mb-1">Assistant</p>
+                            <div class="text-gray-700">
+                                <span class="typing-indicator">Thinking</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                elements.chatArea.appendChild(indicatorDiv);
+                elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
+            }
+
+            // Mock function to save a message to the database
+            function saveMessageToDatabase(chatId, role, content) {
+                // In a real app, this would be an API call to save to MongoDB
+                console.log(`Saving message to database: chatId=${chatId}, role=${role}, content=${content}`);
+
+                // Real implementation would use the MongoDB endpoint:
+                // POST to https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb
+                // with the appropriate request body
+            }
+
+            // Handle sending a message
+            function handleSendMessage() {
+                const message = elements.messageInput.value.trim();
+                if (message) {
+                    addUserMessage(message);
+                    elements.messageInput.value = '';
+                    resizeTextarea();
+                    
+                    // Show typing indicator while "AI is thinking"
+                    showTypingIndicator();
+                    
+                    // In a real app, this would call an AI API
+                    // For demo purposes, we'll simulate a delay and response
+                    setTimeout(() => {
+                        handleAIResponse(message);
+                    }, 1500);
+                }
+            }
+
+            // Mock AI response handler
+            function handleAIResponse(userMessage) {
+                // In a real app, this would be the result from the AI API call
+                let response;
+                
+                if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
+                    response = "Hello! How can I assist you today with your organization's questions?";
+                } else if (userMessage.toLowerCase().includes('help')) {
+                    response = "I can help with various tasks related to your organization. You can ask me questions about documents you've uploaded, request information about your organization's policies, or ask me to analyze data for you.";
+                } else if (userMessage.toLowerCase().includes('document') || userMessage.toLowerCase().includes('upload')) {
+                    response = "You can upload documents by clicking the paperclip icon in the chat input. I can then analyze these documents and answer questions about their content.";
+                } else if (userMessage.toLowerCase().includes('voice')) {
+                    response = "You can use voice input by clicking the microphone icon at the top right. This allows you to speak your questions instead of typing them.";
+                } else {
+                    response = "I understand your query about '" + userMessage.substring(0, 30) + "...'. To provide a more accurate answer, I would need to access your organization's specific data. In a full implementation, I would connect to your knowledge base to retrieve relevant information.";
+                }
+                
+                addAssistantMessage(response);
+            }
+
+            // Handle file upload
+            function handleFileUpload() {
+                elements.fileInput.click();
+            }
+
+            elements.fileInput.addEventListener('change', async function(e) {
+                if (this.files && this.files[0]) {
+                    const file = this.files[0];
+                    addSystemMessage(`File selected: ${file.name}`);
+                    
+                    // Show loading state
+                    showTypingIndicator();
+                    
+                    // In a real app, we would upload the file using FormData
+                    // For demo purposes, we'll simulate processing the file
+                    setTimeout(() => {
+                        addAssistantMessage(`I've processed "${file.name}". This file appears to be a ${file.type} document. What would you like to know about its contents?`);
+                    }, 2000);
+                    
+                    // Clear the input to allow uploading the same file again
+                    this.value = '';
+                }
+            });
+
+            // Handle voice input
+            function handleVoiceInput() {
+                elements.voiceInputModal.style.display = 'flex';
+                startVoiceRecognition();
+            }
+
+            // Mock function for voice recognition
+            function startVoiceRecognition() {
+                // In a real app, this would use the Web Speech API or a similar service
+                appState.isRecording = true;
+                elements.micIcon.classList.add('hidden');
+                elements.stopIcon.classList.remove('hidden');
+                elements.voiceStatus.textContent = 'Listening...';
+                
+                // Simulate recognition with a timeout
+                setTimeout(() => {
+                    const mockRecognizedText = "What are the key metrics for our Q2 performance?";
+                    appState.voiceText = mockRecognizedText;
+                    elements.voiceText.textContent = mockRecognizedText;
+                    elements.voiceStatus.textContent = 'I heard:';
+                    elements.micIcon.classList.remove('hidden');
+                    elements.stopIcon.classList.add('hidden');
+                    appState.isRecording = false;
+                }, 3000);
+            }
+
+            // Function to resize the textarea based on content
+            function resizeTextarea() {
+                const textarea = elements.messageInput;
+                textarea.style.height = 'auto';
+                textarea.style.height = (textarea.scrollHeight) + 'px';
+            }
+
+            // Function to toggle sidebar on mobile
+            function toggleSidebar() {
+                appState.isSidebarOpen = !appState.isSidebarOpen;
+                if (appState.isSidebarOpen) {
+                    elements.sidebar.classList.remove('sidebar-closed');
+                } else {
+                    elements.sidebar.classList.add('sidebar-closed');
+                }
+            }
+
+            // Function for user login
+            function handleLogin() {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                if (!email || !password) {
+                    alert('Please enter both email and password');
+                    return;
+                }
+                
+                // Mock authentication (in a real app, this would be an API call)
+                appState.user = {
+                    id: 'user123',
+                    email: email,
+                    firstName: 'John',
+                    lastName: 'Doe'
+                };
+                
+                appState.isLoggedIn = true;
+                localStorage.setItem('gptUser', JSON.stringify(appState.user));
+                
+                elements.loginModal.style.display = 'none';
+                updateUIAfterLogin();
+            }
+
+            // Function for user signup
+            function handleSignup() {
+                const firstName = document.getElementById('firstName').value;
+                const lastName = document.getElementById('lastName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                // Basic validation
+                if (!firstName || !lastName || !email || !password) {
+                    alert('Please fill in all fields');
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match');
+                    return;
+                }
+                
+                // Mock account creation (in a real app, this would be an API call)
+                appState.user = {
+                    id: 'user' + Date.now(),
+                    email: email,
+                    firstName: firstName,
+                    lastName: lastName
+                };
+                
+                appState.isLoggedIn = true;
+                localStorage.setItem('gptUser', JSON.stringify(appState.user));
+                
+                elements.signupModal.style.display = 'none';
+                updateUIAfterLogin();
+            }
+
+            // Function to handle user logout
+            function handleLogout() {
+                appState.user = null;
+                appState.isLoggedIn = false;
+                localStorage.removeItem('gptUser');
+                elements.profileMenu.classList.add('hidden');
+                elements.loginModal.style.display = 'flex';
+            }
+
+            // Toggle dark/light mode
+            function toggleTheme() {
+                appState.darkMode = !appState.darkMode;
+                if (appState.darkMode) {
+                    document.documentElement.classList.add('dark');
+                    elements.themeToggleBtn.innerHTML = '<i class="bi bi-sun text-xl"></i>';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    elements.themeToggleBtn.innerHTML = '<i class="bi bi-moon text-xl"></i>';
+                }
+            }
+
+            // Set up all event listeners
+            function setupEventListeners() {
+                // Send message when Send button is clicked
+                elements.sendButton.addEventListener('click', handleSendMessage);
+                
+                // Send message on Enter (but allow Shift+Enter for new lines)
+                elements.messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                    }
+                });
+                
+                // Auto-resize textarea as user types
+                elements.messageInput.addEventListener('input', resizeTextarea);
+                
+                // Create a new chat
+                elements.newChatBtn.addEventListener('click', createNewChat);
+                
+                // Toggle sidebar on mobile
+                elements.menuToggle.addEventListener('click', toggleSidebar);
+                
+                // Modal event listeners
+                elements.closeLoginBtn.addEventListener('click', () => {
+                    if (!appState.isLoggedIn) {
+                        // Don't allow closing if not logged in
+                        alert('Please log in to continue');
+                    } else {
+                        elements.loginModal.style.display = 'none';
+                    }
+                });
+                
+                elements.closeSignupBtn.addEventListener('click', () => {
+                    elements.signupModal.style.display = 'none';
+                    if (!appState.isLoggedIn) {
+                        elements.loginModal.style.display = 'flex';
+                    }
+                });
+                
+                elements.showSignupBtn.addEventListener('click', () => {
+                    elements.loginModal.style.display = 'none';
+                    elements.signupModal.style.display = 'flex';
+                });
+                
+                elements.showLoginBtn.addEventListener('click', () => {
+                    elements.signupModal.style.display = 'none';
+                    elements.loginModal.style.display = 'flex';
+                });
+                
+                // Authentication handlers
+                elements.loginBtn.addEventListener('click', handleLogin);
+                elements.signupBtn.addEventListener('click', handleSignup);
+                
+                // User profile dropdown
+                elements.userProfileDropdown.addEventListener('click', () => {
+                    elements.profileMenu.classList.toggle('hidden');
+                });
+                
+                // Logout handler
+                elements.logoutBtn.addEventListener('click', handleLogout);
+                
+                // File upload
+                elements.uploadBtn.addEventListener('click', handleFileUpload);
+                
+                // Voice input handlers
+                elements.voiceInputBtn.addEventListener('click', handleVoiceInput);
+                elements.cancelVoiceBtn.addEventListener('click', () => {
+                    elements.voiceInputModal.style.display = 'none';
+                    appState.voiceText = '';
+                    elements.voiceText.textContent = '';
+                });
+                
+                elements.confirmVoiceBtn.addEventListener('click', () => {
+                    if (appState.voiceText) {
+                        elements.messageInput.value = appState.voiceText;
+                        elements.voiceInputModal.style.display = 'none';
+                        handleSendMessage();
+                    } else {
+                        alert('No voice input detected');
+                    }
+                });
+                
+                // Theme toggle
+                elements.themeToggleBtn.addEventListener('click', toggleTheme);
+            }
+
+            // Initialize the application
+            init();
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
